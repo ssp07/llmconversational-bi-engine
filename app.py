@@ -3,23 +3,22 @@ import sqlite3
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
-from sqlalchemy import create_engine
 import re
 
 # ==========================================
-# 1. DATABASE CONNECTIVITY & NORMALIZATION
+# 1. DATABASE CONNECTIVITY LAYER
 # ==========================================
 DB_FILE = "bi_data.db"
-engine = create_engine(f"sqlite:///{DB_FILE}")
 
 def load_dataset():
     if os.path.exists("dataset.csv"):
         df = pd.read_csv("dataset.csv")
-        # Strip all whitespace, convert to lowercase, replace special chars with underscores
         df.columns = [c.strip().lower().replace(" ", "_").replace("-", "_").replace("(", "").replace(")", "") for c in df.columns]
-        df.to_sql("analytics_table", engine, if_exists="replace", index=False)
+        
+        # Ensure a clean local SQLite connection node
+        conn = sqlite3.connect(DB_FILE)
+        df.to_sql("analytics_table", conn, if_exists="replace", index=False)
+        conn.close()
         return "analytics_table"
     
     conn = sqlite3.connect(DB_FILE)
@@ -36,17 +35,16 @@ def load_dataset():
 active_table = load_dataset()
 
 # ==========================================
-# 2. STREAMLIT Front-End Setup
+# 2. STREAMLIT Front-End Layout
 # ==========================================
 st.set_page_config(page_title="Conversational BI Engine", layout="wide")
-st.title(" 🚀 Enterprise Conversational BI Engine & Strategy Matrix")
+st.title("📊 Enterprise Conversational BI Engine & Strategy Matrix")
 st.markdown("---")
 
 conn = sqlite3.connect(DB_FILE)
 df_schema = pd.read_sql_query(f"SELECT * FROM {active_table} LIMIT 1", conn)
 conn.close()
 
-# Dynamic dataset-aware FAQ matrix generation
 is_ecommerce = "visit_duration" in df_schema.columns or "n_products_viewed" in df_schema.columns
 
 if is_ecommerce:
@@ -126,7 +124,7 @@ q_dropdown = faq_registry[selected_faq] if selected_faq != "Select a pre-verifie
 q_manual, is_manual_valid = parse_manual_input(user_input)
 
 # ==========================================
-# 4. DATA TRANSFORMATION & EXECUTOR
+# 4. REPORT RUNTIME & GRAPH COUPLING
 # ==========================================
 if q_dropdown or q_manual:
     st.markdown("---")
@@ -147,51 +145,55 @@ if q_dropdown or q_manual:
     for container, target_query, label_text in queries_to_run:
         df_results = pd.DataFrame()
         try:
-            df_results = pd.read_sql_query(target_query, engine)
+            conn = sqlite3.connect(DB_FILE)
+            df_results = pd.read_sql_query(target_query, conn)
+            conn.close()
         except Exception as query_err:
             container.error(f"Processing Error on pipeline node: {query_err}")
             
         if not df_results.empty:
             container.success(f"Executed SQL Expression ({label_text}): `{target_query}`")
             
-            # Safe calculation parameters with zero column dependency crashes
+            # Compute KPI summaries
             total_rows = len(df_results)
             avg_duration = df_results["visit_duration"].mean() if "visit_duration" in df_results.columns else 0
             avg_views = df_results["n_products_viewed"].mean() if "n_products_viewed" in df_results.columns else 0
             mobile_pct = (df_results["is_mobile"] == 1).sum() / total_rows * 100 if "is_mobile" in df_results.columns else 0
             conversion_rate = (df_results["user_action"] == 1).sum() / total_rows * 100 if "user_action" in df_results.columns else 0
 
-            # 📝 Strategy Bullet Summary
+            # 📝 Strategy Bulletin Callout Layout
             container.markdown("### 🎯 Executive Data Trend Summary")
             container.info(f"""
-* **💎 Segment Density:** Identified **{total_rows} matching data records** inside this specific dataset slice.
+* **💎 Segment Density & Funnel Scaling:** Identified **{total_rows} matching traffic records** inside this specific dataset slice.
 * **⚡ Funnel Browse Velocity:** Active users average a browse window of **{avg_duration:.2f} seconds** and scan **{avg_views:.1f} items**.
 * **📱 Funnel Channel Allocation:** **{mobile_pct:.1f}%** of this traffic profile originated directly via mobile device configurations.
 * **🎯 Bottom-Line Conversion Rate:** The exact click-to-action conversion rate parameter for this segment layer is sitting explicitly at **{conversion_rate:.1f}%**.
             """)
             
-            container.markdown("### 📋 Filtered Data Grid Table")
-            container.dataframe(df_results.head(100), use_container_width=True, hide_index=True)
-            
             # ==========================================
-            # 🌟 AUTOMATIC BROAD DYNAMIC COLUMN RESOLVER (FIXES BLANK SCREEN CRASHES)
+            # 🌟 NATIVE STREAMLIT BI GRAPH VIEWPORTS (GUARANTEED RENDER)
             # ==========================================
             container.markdown("### 📈 Strategic Trend-Highlighted Visual Charts")
             
-            # Explicitly find any numeric column inside the active dataframe to use for mapping charts
             numeric_cols = df_results.select_dtypes(include=[np.number]).columns.tolist()
-            text_cols = df_results.select_dtypes(include=[object]).columns.tolist()
-            
-            # Establish fallback variables if exact e-commerce metrics aren't matching
             y_axis = "visit_duration" if "visit_duration" in numeric_cols else (numeric_cols[-1] if numeric_cols else df_results.columns[-1])
-            x_axis = "n_products_viewed" if "n_products_viewed" in numeric_cols else (numeric_cols[0] if len(numeric_cols) > 1 else df_results.columns[0])
+            x_axis = "n_products_viewed" if "n_products_viewed" in numeric_cols else (numeric_cols[0] if len(numeric_cols) > 0 else df_results.columns[0])
             
-            # Ensure a clean shallow object frame copy is formatted as numbers explicitly
             df_chart = df_results.head(100).copy().reset_index(drop=True)
             df_chart[x_axis] = pd.to_numeric(df_chart[x_axis], errors='coerce').fillna(0)
             df_chart[y_axis] = pd.to_numeric(df_chart[y_axis], errors='coerce').fillna(0)
             
-            # Build Side-By-Side Visual Display Sub-Grids
+            # Side-By-Side dynamic columns grid using native web elements
             g_col1, g_col2 = container.columns(2)
             
             with g_col1:
+                g_col1.markdown(f"**Chart A: User Velocity Analysis (Bar Chart Tracking {y_axis.upper()})**")
+                # Create structured chart layout matrix using native backend objects
+                df_bar = df_chart.set_index(x_axis)[[y_axis]]
+                g_col1.bar_chart(df_bar, height=350, use_container_width=True)
+                
+            with g_col2:
+                g_col2.markdown(f"**Chart B: Linear Trend Trajectory Matrix (Area Distribution Tracking {y_axis.upper()})**")
+                df_line = df_chart.set_index(x_axis)[[y_axis]]
+                g_col2.area_chart(df_line, height=350, use_container_width=True)
+
